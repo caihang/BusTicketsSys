@@ -16,16 +16,16 @@
 #define MAXDATASIZE 1000000
 
 log_t *log;                         /*½ø³ÌÈ«¾ÖÈÕÖ¾ÎÄ¼ş¾ä±ú*/
-void process_cli(int connfd, struct sockaddr_in client,MYSQL my_connection);
+void process_cli(int connfd, struct sockaddr_in client);
 void savadata_r(char *recvbuf, int len, char *cli_data);
 void thread_func(void *arg);
+void getthetime(char hyy[12]);
 int Authentication(char terminal_id[], char Authentication_code[]);
 
 struct ARG                          /*Ïß³Ìº¯Êı´«µİËùĞè²ÎÊı*/
 {
     int connfd;                     /*Á¬½ÓÌ×½Ó×Ö*/
     struct sockaddr_in client;      /*¿Í»§¶ËÌ×½Ó×ÖµØÖ·*/
-    MYSQL my_connection;            /*MySQLÁ¬½Ó¾ä±ú*/
 };
 
 #pragma (push,1)
@@ -33,7 +33,7 @@ typedef struct DATA
 {
     char start_symbol[16];          /*Æô¶¯·û*/
     int data_NO;                    /*Êı¾İ°üÁ÷Ë®ºÅ*/
-    char time_flag[7];              /*Ê±¼ä±êÇ©*/
+    char time_flag[12];              /*Ê±¼ä±êÇ©*/
     char terminal_ID[20];           /*Ç°¶Ë»ú±êÊ¶ºÅ*/
     char Authentication_codes[10];  /*ÈÏÖ¤Âë*/
     char data_type;                 /*Êı¾İÀàĞÍ*/
@@ -42,8 +42,8 @@ typedef struct DATA
 typedef struct VIDEO_SUMMARY_DATA   /*ÊÓÆµÕªÒªĞÅÏ¢*/
 {
     char video_file_name[50];       /*ÎÄ¼şÃû*/
-    char start_time[7];             /*¿ªÊ¼Ê±¼ä*/
-    char end_time[7];               /*½áÊøÊ±¼ä*/
+    char start_time[12];             /*¿ªÊ¼Ê±¼ä*/
+    char end_time[12];               /*½áÊøÊ±¼ä*/
 }video_summary_data;
 
 typedef struct PERSON_DATA          /*ÈËÔ±ĞÅÏ¢*/
@@ -52,16 +52,15 @@ typedef struct PERSON_DATA          /*ÈËÔ±ĞÅÏ¢*/
     char people_num;                /*ÈËÔ±ÊıÁ¿*/
     char longitude[4];              /*¾­¶È*/
     char latitude[4];               /*Î³¶È*/
-    char time_flag[7];               /*Ê±¼ä±êÇ©*/
+    char time_flag[12];               /*Ê±¼ä±êÇ©*/
 }person_data;
 #pragma (pop)
 
 int main()
 {
-    MYSQL my_connection;                /*Êı¾İ¿âÁ¬½Ó¾ä±ú*/
-    tpool_t *pool = NULL;               /*Ïß³Ì³ØÖ¸Õë*/
-    log = log_open("server.log",0);     /*¿ªÆô¼ÇÂ¼ÎÄ¼ş*/
-    pool = tpool_init(200,300,1);       /*´´½¨Ò»¸öÓĞ200¸ö¹¤×÷Ïß³Ì£¬×î´ó300¸öÈÎÎñ¶ÓÁĞµÄÏß³Ì³Ø*/
+    tpool_t *pool = NULL;                /*Ïß³Ì³ØÖ¸Õë*/
+    log = log_open("server.log",0);      /*¿ªÆô¼ÇÂ¼ÎÄ¼ş*/
+    pool = tpool_init(200,300,1);        /*´´½¨Ò»¸öÓĞ200¸ö¹¤×÷Ïß³Ì£¬×î´ó300¸öÈÎÎñ¶ÓÁĞµÄÏß³Ì³Ø*/
 
 	int listenfd, connectfd;
 
@@ -70,79 +69,65 @@ int main()
 	struct sockaddr_in client;
 	socklen_t len;
 
-    while(1)                            /*Á¬½ÓÊı¾İ¿â*/
-    {
-        mysql_init(&my_connection);     /*³õÊ¼»¯,my_connectionÊÇÒ»¸öÁ¬½Ó¾ä±ú£¬½¨ÒéÊ¹ÓÃÕâÖÖ·½Ê½¶ø²»ÊÇ²ÉÓÃÖ¸Õë½ÓÊÕ·µ»Ø¾ä±ú*/
-        if(mysql_real_connect(&my_connection, "localhost","caihang", "admincai", "businfo", 0, NULL, 0))
-                                        /*Á¬½ÓbusinfoÊı¾İ¿â£¬Êı¾İ¿âÃû×Ö½¨ÒéÊ¹ÓÃĞ¡Ğ´£¬ÀûÓÚÆ½Ì¨ÒÆÖ²*/
-        {
-            printf("Connection success£¡\n");
-            break;
-        }
-        else
-        {
-            printf("connect database faild,connect again...\n");
-                                        /*ÌáÊ¾Á¬½ÓÊı¾İ¿âÊ§°Ü£¬ÕıÔÚÖØĞÂÁ¬½Ó*/
-        }
-    }
-
 	if ((listenfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-		perror("creating socket failed.");
+		lprintf(log, FATAL, "creating socket failed.\n");
 		exit(1);
 	}
 
 	int opt = SO_REUSEADDR;
 	setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
 	bzero(&server, sizeof(server));
 	server.sin_family = AF_INET;
-	server.sin_PORT = htons(PORT);
+	server.sin_port = htons(PORT);
 	server.sin_addr.s_addr = htonl(INADDR_ANY);
 
 	if (bind(listenfd, (struct sockaddr *) &server, sizeof(server)) == -1) {
-		perror("Bind() error.");
+		lprintf(log, FATAL, "Bind() error.\n");
 		exit(1);
 	}
 
 	if (listen(listenfd, BACKLOG) == -1) {
-		perror("listen() error.");
+		lprintf(log, INFO, "listen() error.\n");
 		exit(1);
 	}
 
 	len = sizeof(client);
-    arg->my_connection = my_connection;
 
 	while(1)
     {
+        lprintf(log, INFO, "waiting connecting...\n");
         if((connectfd = accept(listenfd, (struct sockaddr *)&client,&len)) == -1)
         {
-            perror("accept() error\n");
+            lprintf(log, FATAL, "accept() error\n");
             exit(1);
         }
 
         arg = (struct ARG*)malloc(sizeof(struct ARG));
         arg->connfd = connectfd;
         memcpy((void *)&arg->client,&client,sizeof(client));
-
+        lprintf(log, INFO, "Starting add a work\n");
         tpool_add_work(pool,thread_func,(void *)arg);   //Ôö¼ÓÒ»¸ö¹¤×÷Ïß³Ì,arg²ÎÊı´«µİ
 	}
 	close(listenfd);
 }
 
-void process_cli(int connfd, struct sockaddr_in client,MYSQL my_connection)
+void process_cli(int connfd, struct sockaddr_in client)
 {
+    MYSQL  my_connection;                               //Êı¾İ¿âÁ¬½Ó¾ä±ú
     int i, rtn, offset, res, num = 0;                   //iÓÃÓÚÑ­»·ÏÂ±ê£¬numÓÃÓÚÅĞ¶ÏÊı¾İÊÇ·ñ½ÓÊÕÍê±Ï,rtnÊÇ½ÓÊÜº¯ÊıµÄ·µ»ØÖµ£¬offsetÊÇÓÃÓÚÊı¾İ´¦ÀíÊ±µÄÆ«ÒÆÁ¿,resÓÃÓÚmy_query·µ»ØÖµ
     int video_data_num, person_data_num;                //ÊÓÆµÕªÒªĞÅÏ¢ÌõÊıºÍÈËÊıĞÅÏ¢ÌõÊı
+
+    char ftpserverIPaddr[4];                            //ftpserverIPaddrÓÃÀ´Ôİ´æftp·şÎñÆ÷IPµØÖ·
+    char recvbuf[MAXDATASIZE];                          //½ÓÊÕÊı¾İ»º³åÇø
+    char sql[200] = {0};                                //sqlÓï¾äÖ¸Õë
+    char receipttime[12];                               //´æ·ÅÊı¾İ½ÓÊÕÊ±¼ä
 
     data *now_data = NULL;                              //ÓÃÓÚ´æ·ÅÊÕµ½µÄÊı¾İ°üÖĞ³ıÊı¾İ³¤¶ÈºÍÊı¾İÄÚÈİÒÔÍâµÄÆäËûÊı¾İ
     video_summary_data *now_video_data = NULL;          //ÓÃÓÚ´æ·Å½ÓÊÕµ½µÄgpsÊı¾İÖĞµÄÃ¿Ò»¸öÊı¾İµ¥Ôª
     person_data *now_person_data = NULL;                //ÓÃÓÚ´æ·Å½ÓÊÕµ½µÄÈËÔ±ĞÅÏ¢ÖĞµÄÃ¿Ò»¸öÊı¾İµ¥Ôª
 
-    char ftpserverIPaddr[4];                            //cli_dataÓÃÓÚ´æ·Å¿Í»§ĞÅÏ¢£¬ftpÓÃÀ´Ôİ´æftp·şÎñÆ÷IPµØÖ·
-    char recvbuf[MAXDATASIZE];                          //½ÓÊÕÊı¾İ»º³åÇø
-    char *sql, *dest;                                   //·Ö±ğÊÇsqlÓï¾äºÍÓÃÀ´Á¬½ÓsqlÓï¾äµÄÖ¸Õë
-    sql = dest = NULL;
-
-    printf("You got a cnnection from %s.\n",inet_ntoa(client.sin_addr));
+    lprintf(log, INFO, "You got a cnnection from %s.\n",inet_ntoa(client.sin_addr));
 
     do                                                  //¿ªÊ¼½ÓÊÕÊı¾İ£¬ÓÃÑ­»·½ÓÊÕÖ±µ½½ÓÊÕÍê±Ï
     {
@@ -153,10 +138,11 @@ void process_cli(int connfd, struct sockaddr_in client,MYSQL my_connection)
         }
         else
         {
-            printf("Recevied %d bytes\n",rtn);          //ÏÔÊ¾Êµ¼Ê½ÓÊÕµ½µÄ×Ö½ÚÊı
+            lprintf(log, INFO, "Recevied %d bytes\n",(rtn + num));
+                                                        //¼ÇÂ¼Êµ¼Ê½ÓÊÕµ½µÄ×Ö½ÚÊı
             num = (*(int *)(recvbuf + 58));             //»ñÈ¡Êı¾İ³¤¶È
-            printf("actually should recevied %d bytes\n",num);
-                                                        //ÏÔÊ¾Ô­±¾Ó¦¸Ã½ÓÊÕµ½µÄ×Ö½ÚÊı
+            lprintf(log, INFO, "actually should recevied %d bytes\n",num);
+                                                        //¼ÇÂ¼Ô­±¾Ó¦¸Ã½ÓÊÕµ½µÄ×Ö½ÚÊı
             if(rtn != (num + 58))                       //ÅĞ¶ÏÊÇ·ñ½ÓÊÜÍê±Ï
             {
                 num = num + rtn;                        //num×÷Îª½ÓÊÕÊı×éÏÂ±ê¶øÒÆ¶¯
@@ -165,45 +151,61 @@ void process_cli(int connfd, struct sockaddr_in client,MYSQL my_connection)
         }
     }while(rtn != (num + 58));                          //Ñ­»·Ìõ¼ş
 
+    getthetime(receipttime);                            //»ñÈ¡½ÓÊÕÊı¾İµÄÊ±¼ä
+
     now_data = (data *)recvbuf;                         //È¡³öÇ°ÃæÒ»²¿·ÖĞÅÏ¢
 
-    if(strcmp(now_data.start_symbol,"AAAAAAAAAAAAABBB") != 0)
+    if(strcmp((*now_data).start_symbol,"AAAAAAAAAAAAABBB") != 0)
                                                         //Èô²»ÊÇÆô¶¯·û£¬Ôò¶ªÆúÊı¾İ
     {
-        printf("Recvied a invalid data.\n");
+        lprintf(log, FATAL, "Recvied a invalid data.\n");
         return;                                         //º¯Êı·µ»Ø
     }
 
-    dest = "select * from bus_base_info where terminal_id=";
-                                                        //Á¬½Ósql²éÑ¯Óï¾ä×Ö·û´®
-    strcat(sql,dest);
-    strcat(sql,"'");
-    strcat(sql,now_data.terminal_ID);
-    strcat(sql,"'");
+    while(1)                            /*Á¬½ÓÊı¾İ¿â*/
+    {
+        mysql_init(&my_connection);     /*³õÊ¼»¯,my_connectionÊÇÒ»¸öÁ¬½Ó¾ä±ú£¬½¨ÒéÊ¹ÓÃÕâÖÖ·½Ê½¶ø²»ÊÇ²ÉÓÃÖ¸Õë½ÓÊÕ·µ»Ø¾ä±ú*/
+        if(mysql_real_connect(&my_connection, "localhost","caihang", "admincai", "businfo", 0, NULL, 0))
+                                        /*Á¬½ÓbusinfoÊı¾İ¿â£¬Êı¾İ¿âÃû×Ö½¨ÒéÊ¹ÓÃĞ¡Ğ´£¬ÀûÓÚÆ½Ì¨ÒÆÖ²*/
+        {
+            lprintf(log, INFO, "Connection success\n");
+            break;
+        }
+        else
+        {
+            lprintf(log, FATAL, "connect database faild,connect again...\n");
+                                        /*¼ÇÂ¼Á¬½ÓÊı¾İ¿âÊ§°Ü£¬ÕıÔÚÖØĞÂÁ¬½Ó*/
+        }
+    }
+
+    sprintf(sql, "select * from bus_base_info where terminal_id= '%s'",(*now_data).terminal_ID);
 
     if(res = mysql_query(&my_connection, sql) != 0)
                                                         //²éÊı¾İ¿âbus_base_info±í¿´½ÓÊÕµ½µÄÇ°¶Ë»úIDÊÇ·ñ´æÔÚ
     {
-        printf("TerminalID can not found\n");
+        lprintf(log, FATAL, "TerminalID can not found\n");
+        mysql_close(&my_connection);
         return;
     }
 
-    if(rtn = Authentication(now_data.terminal_ID, now_data.Authentication_codes) == 0)
+    if(rtn = Authentication((*now_data).terminal_ID, (*now_data).Authentication_codes) == 0)
                                                         //Èç¹ûÑéÖ¤Âë´íÎó
     {
-        printf("Authentication_code wrong!\n");         //ÔòÏÔÊ¾²¢·µ»Ø
+        lprintf(log, FATAL, "Authentication_code wrong!\n");         //ÔòÏÔÊ¾²¢·µ»Ø
+        mysql_close(&my_connection);
         return;
     }
 
     /*Êı¾İÎŞÎó£¬¿ªÊ¼´¦Àí*/
-    if(now_data.data_type == 0x20);                     //Èç¹ûÊı¾İÀàĞÍÊÇÊÓÆµÕªÒªĞÅÏ¢
+    if((*now_data).data_type == 0x20);                     //Èç¹ûÊı¾İÀàĞÍÊÇÊÓÆµÕªÒªĞÅÏ¢
     {
         memcpy(ftpserverIPaddr, recvbuf+63,4);          //½«ftp·şÎñÆ÷ipµØÖ·¿½±´
         video_data_num = (*(int *)recvbuf + 67);        //»ñÈ¡Êı¾İÄÚÈİÀïgpsÊı¾İµÄÊı¾İ³¤¶È
 
         if(video_data_num <= 0)                         //Èç¹ûÊı¾İ³¤¶ÈĞ¡ÓÚ0£¬Ôò¶ªÆú¸Ã´íÎóÊı¾İ£¬²¢¼ÇÂ¼ÈÕÖ¾
         {
-            lprintf(log, INFO, "recvied video summary data's length less than 0.");
+            lprintf(log, FATAL, "recvied video summary data's length less than 0.\n");
+            mysql_close(&my_connection);
             return;
         }
 
@@ -212,35 +214,36 @@ void process_cli(int connfd, struct sockaddr_in client,MYSQL my_connection)
         {
             now_video_data = (video_summary_data *)(recvbuf + offset);    //½«Êı¾İ×ª»»Îªvideo½á¹¹Ìå
 
-            sprintf(sql, "insert into video_summary_info(serialnumber,terminal_id,FTPserverIPaddr,video_name,starttime,endtime,receipttime)values('%s','%s','%s','%s','%s','%s','%s')",
-                    now_data.data_NO, now_data.terminal_ID, ftpserverIPaddr, now_video_data.video_file_name, now_video_data.start_time,
-                    now_video_data.end_time,/*½ÓÊÕÊ±¼ä*/);                //Á¬½Ó²éÑ¯Óï¾ä
+            sprintf(sql, "insert into video_summary_info(serialnumber,terminal_id,FTPserverIPaddr,video_name,starttime,endtime,receipttime)values('%d','%s','%s','%s','%s','%s','%s')",
+                    (*now_data).data_NO, (*now_data).terminal_ID, ftpserverIPaddr, (*now_video_data).video_file_name, (*now_video_data).start_time,
+                    (*now_video_data).end_time,receipttime);                //Á¬½Ó²éÑ¯Óï¾ä
 
             if(mysql_query(&my_connection,sql) != 0)                      //²åÈëÒ»ÌõÊÓÆµÕªÒªĞÅÏ¢
             {
-                printf("insert video_summary_data failed\n");
+                lprintf(log, FATAL, "insert video_summary_data failed\n");
+                mysql_close(&my_connection);
                 return;
             }
             else
             {
-                printf("insert video_summary_data sucess\n");
-                sql = dest = NULL;
+                lprintf(log, INFO, "insert video_summary_data sucess\n");
             }
             offset+=64;                                                   //Æ«ÒÆÁ¿ÒÆ¶¯64¸ö×Ö½ÚÒÔ»ñÈ¡ÏÂÒ»Ìõ¼ÇÂ¼
         }
 
         /***»Ø´«¿Í»§¶ËÓ¦´ğÊı¾İ·â×°ºÍ·¢ËÍ***/
-        now_data.data_type = 0x21;
-        now_data.data_NO++;
+        (*now_data).data_type = 0x21;
+        (*now_data).data_NO++;
         send(connfd,(char *)now_data,sizeof(data),0);
     }
-    else if(now_data.data_type == 0x30)                                 //Èç¹ûÊı¾İÀàĞÍÊÇÈËÔ±ĞÅÏ¢
+    if((*now_data).data_type == 0x30)                                 //Èç¹ûÊı¾İÀàĞÍÊÇÈËÔ±ĞÅÏ¢
     {
         person_data_num = (*(int *)recvbuf + 59);                       //»ñÈ¡½ÓÊÕµ½µÄÈËÔ±ĞÅÏ¢Êı¾İ³¤¶È
 
         if(person_data_num <= 0)                                        //Èç¹ûÊı¾İ³¤¶ÈĞ¡ÓÚ0Ôò¶ªÆúÊı¾İ
         {
-            lprintf(log, INFO, "recvied person data's length is less than 0.");
+            lprintf(log, FATAL, "recvied person data's length is less than 0.\n");
+            mysql_close(&my_connection);
             return ;
         }
 
@@ -249,33 +252,35 @@ void process_cli(int connfd, struct sockaddr_in client,MYSQL my_connection)
         {
             now_person_data = (person_data *)(recvbuf + offset);        /*½«Êı¾İ×ª»»Îªnow_person_data½á¹¹ÌåÊı¾İ*/
 
-            sprintf(sql, "insert into data_from_terminal(serialnumber,terminal_id,bus_status,longitude,latitude,num_of_people,collect_time,receipttime)values('%s','%s','%c','%s','%s','%c','%s','%s')",
-                    now_data.data_NO, now_data.terminal_ID, now_person_data.bus_work_status, now_person_data.longitude, now_person_data.latitude,
-                    now_person_data.people_num, now_person_data.time_flag,/*½ÓÊÕÊ±¼ä*/);
+            sprintf(sql, "insert into data_from_terminal(serialnumber,terminal_id,bus_status,longitude,latitude,num_of_people,collect_time,receipttime)values('%d','%s','%c','%s','%s','%c','%s','%s')",
+                    (*now_data).data_NO, (*now_data).terminal_ID, (*now_person_data).bus_work_status, (*now_person_data).longitude, (*now_person_data).latitude,
+                    (*now_person_data).people_num, (*now_person_data).time_flag,receipttime);
 
             if(mysql_query(&my_connection,sql) != 0)                    //²åÈëÒ»ÌõÈËÔ±ĞÅÏ¢
             {
-                printf("insert person_data failed\n");
+                lprintf(log, FATAL, "insert person_data failed\n");
+                mysql_close(&my_connection);
                 return;
             }
             else
             {
-                printf("insert person_data sucess\n");
-                sql = dest = NULL;
+                lprintf(log, INFO, "insert person_data sucess\n");
             }
             offset += 17;
         }
 
         /***»Ø´«¿Í»§¶ËÓ¦´ğÊı¾İ·â×°ºÍ·¢ËÍ***/
-        now_data.data_type = 0x31;
-        now_data.data_NO++;
+        (*now_data).data_type = 0x31;
+        (*now_data).data_NO++;
         send(connfd,(char *)now_data,sizeof(data),0);
     }
-    else                                                                  //²»ÊÇ¹æ¶¨µÄÊı¾İÀàĞÍ
+    else                                                                    //²»ÊÇ¹æ¶¨µÄÊı¾İÀàĞÍ
     {
-        printf("can't identified the data type\n");
+        lprintf(log, FATAL, "can't identified the data type\n");
+        mysql_close(&my_connection);
         return ;
     }
+    mysql_close(&my_connection);                                            //¹Ø±ÕÊı¾İ¿âµÄÁ¬½Ó
 }
 
 void thread_func(void *arg)  /*Ïß³Ìº¯Êı*/
@@ -283,7 +288,7 @@ void thread_func(void *arg)  /*Ïß³Ìº¯Êı*/
     struct ARG *info = NULL;
     info = (struct ARG *)arg;
 
-    process_cli(info->connfd,info->client,info->my_connection);   /*µ÷ÓÃÏß³Ì´¦Àíº¯Êı*/
+    process_cli(info->connfd,info->client);                         /*µ÷ÓÃÏß³Ì´¦Àíº¯Êı*/
     free(arg);
     pthread_exit(NULL);
 }
@@ -302,10 +307,40 @@ int Authentication(char terminal_id[], char Authentication_code[])   /*ÑéÖ¤Âë´¦À
     else return 1;
 }
 
-void gettime(char time[7])
+void getthetime(char hyy[12])
 {
-    char testtime[25];
-    time_t now;
-	time(&now);
-	testtime = ctime(&t);
+    char lyy[3],MM[3],dd[3],hh[3],mm[3],ss[3];
+    int year,month,day,hour,min,sec;
+    time_t rawtime;
+    struct tm * timeinfo;
+
+    time ( &rawtime );
+    timeinfo = localtime ( &rawtime );
+
+    year = (1900+timeinfo->tm_year)%100;
+    month = 1+timeinfo->tm_mon;
+    day = timeinfo->tm_mday;
+    hour = timeinfo->tm_hour;
+    min = timeinfo->tm_min;
+    sec = timeinfo->tm_sec;
+
+    lyy[0] = (year/10) + '0';
+    lyy[1] = (year%10) + '0';
+    lyy[2] = '\0';
+    MM[0] = (month/10) + '0';
+    MM[1] = (month%10) + '0';
+    MM[2] = '\0';
+    dd[0] = (day/10) + '0';
+    dd[1] = (day%10) + '0';
+    dd[2] = '\0';
+    hh[0] = (hour/10) + '0';
+    hh[1] = (hour%10) + '0';
+    hh[2] = '\0';
+    mm[0] = (min/10) + '0';
+    mm[1] = (min%10) + '0';
+    mm[2] = '\0';
+    ss[0] = (sec/10) + '0';
+    ss[1] = (sec%10) + '0';
+    ss[2] = '\0';
+    sprintf(hyy,"%s%s%s%s%s%s",lyy,MM,dd,hh,mm,ss);
 }

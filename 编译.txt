@@ -1,0 +1,1 @@
+gcc -I/usr/include/mysql server.c tpool.c log.c -L/usr/lib/mysql -lmysqlclient -g -o server -lpthread
