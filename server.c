@@ -120,7 +120,7 @@ void process_cli(int connfd, struct sockaddr_in client)
 
     char ftpserverIPaddr[4];                            //ftpserverIPaddr用来暂存ftp服务器IP地址
     char recvbuf[MAXDATASIZE];                          //接收数据缓冲区
-    char sql[200] = {0};                                //sql语句指针
+    char sql[400] = {0};                                //sql语句指针
     char receipttime[12];                               //存放数据接收时间
 
     data *now_data = NULL;                              //用于存放收到的数据包中除数据长度和数据内容以外的其他数据
