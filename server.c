@@ -33,8 +33,9 @@ typedef struct DATA
 {
     char start_symbol[16];          /*启动符*/
     int data_NO;                    /*数据包流水号*/
-    char time_flag[12];              /*时间标签*/
+    char time_flag[12];             /*时间标签*/
     char terminal_ID[20];           /*前端机标识号*/
+    char schedule_num[10];          /*班次号*/
     char Authentication_codes[10];  /*认证码*/
     char data_type;                 /*数据类型*/
 }data;
@@ -140,16 +141,16 @@ void process_cli(int connfd, struct sockaddr_in client)
         {
             lprintf(log, INFO, "Recevied %d bytes\n",(rtn + num));
                                                         //记录实际接收到的字节数
-            num = (*(int *)(recvbuf + 58));             //获取数据长度
+            num = (*(int *)(recvbuf + 73));             //获取数据长度
             lprintf(log, INFO, "actually should recevied %d bytes\n",num);
                                                         //记录原本应该接收到的字节数
-            if(rtn != (num + 58))                       //判断是否接受完毕
+            if(rtn != (num + 73))                       //判断是否接受完毕
             {
                 num = num + rtn;                        //num作为接收数组下标而移动
                 continue;                               //未接受完毕则提前结束本次循环,继续接收
             }
         }
-    }while(rtn != (num + 58));                          //循环条件
+    }while(rtn != (num + 73));                          //循环条件
 
     getthetime(receipttime);                            //获取接收数据的时间
 
@@ -178,6 +179,16 @@ void process_cli(int connfd, struct sockaddr_in client)
         }
     }
 
+    /*此处查询schedule排班表看该车是否发车，若未发车则不处理，还需要修改*/
+    sprintf(sql, "select * from schedule where schedule_num= '%s'",(*now_data).schedule_num);
+    if(res = mysql_query(&my_connection, sql) != 0)
+                                                        //查数据库schedule表看接收到的班次号是否发车
+    {
+        lprintf(log, FATAL, "schedule_num can not found\n");
+        mysql_close(&my_connection);
+        return;
+    }
+
     sprintf(sql, "select * from bus_base_info where terminal_id= '%s'",(*now_data).terminal_ID);
 
     if(res = mysql_query(&my_connection, sql) != 0)
@@ -199,8 +210,8 @@ void process_cli(int connfd, struct sockaddr_in client)
     /*数据无误，开始处理*/
     if((*now_data).data_type == 0x20);                     //如果数据类型是视频摘要信息
     {
-        memcpy(ftpserverIPaddr, recvbuf+63,4);          //将ftp服务器ip地址拷贝
-        video_data_num = (*(int *)recvbuf + 67);        //获取数据内容里gps数据的数据长度
+        memcpy(ftpserverIPaddr, recvbuf+77,4);          //将ftp服务器ip地址拷贝
+        video_data_num = (*(int *)recvbuf + 81);        //获取数据内容里gps数据的数据条数
 
         if(video_data_num <= 0)                         //如果数据长度小于0，则丢弃该错误数据，并记录日志
         {
@@ -209,7 +220,7 @@ void process_cli(int connfd, struct sockaddr_in client)
             return;
         }
 
-        offset = 71;
+        offset = 85;
         for(i = 0; i < video_data_num; i++)
         {
             now_video_data = (video_summary_data *)(recvbuf + offset);    //将数据转换为video结构体
@@ -238,7 +249,7 @@ void process_cli(int connfd, struct sockaddr_in client)
     }
     if((*now_data).data_type == 0x30)                                 //如果数据类型是人员信息
     {
-        person_data_num = (*(int *)recvbuf + 59);                       //获取接收到的人员信息数据长度
+        person_data_num = (*(int *)recvbuf + 77);                       //获取接收到的人员信息数据条数
 
         if(person_data_num <= 0)                                        //如果数据长度小于0则丢弃数据
         {
@@ -247,7 +258,7 @@ void process_cli(int connfd, struct sockaddr_in client)
             return ;
         }
 
-        offset = 60;
+        offset = 81;
         for(i = 0; i < person_data_num; i++)
         {
             now_person_data = (person_data *)(recvbuf + offset);        /*将数据转换为now_person_data结构体数据*/
@@ -266,7 +277,7 @@ void process_cli(int connfd, struct sockaddr_in client)
             {
                 lprintf(log, INFO, "insert person_data sucess\n");
             }
-            offset += 17;
+            offset += 22;
         }
 
         /***回传客户端应答数据封装和发送***/
