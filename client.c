@@ -6,11 +6,42 @@
 #include <netinet/in.h>   //主机/网络地址转换
 #include <netdb.h>     //netdb is needed for struct hostent
 #include <sys/types.h>
+#include <time.h>
 
 #define PORT 15110
 #define MAXDATASIZE 100000
 void process(FILE *fp, int sockfd);
 char *getMessage(char *sendline, int len, FILE *fp);
+void getthetime(char hyy[12]);
+
+#pragma (push,1)
+typedef struct DATA
+{
+    char start_symbol[16];          /*启动符*/
+    int data_NO;                    /*数据包流水号*/
+    char time_flag[13];             /*时间标签*/
+    char terminal_ID[20];           /*前端机标识号*/
+    char schedule_num[10];          /*班次号*/
+    char Authentication_codes[11];  /*认证码*/
+    char data_type;                 /*数据类型*/
+}data;
+
+typedef struct VIDEO_SUMMARY_DATA   /*视频摘要信息*/
+{
+    char video_file_name[50];       /*文件名*/
+    char start_time[12];             /*开始时间*/
+    char end_time[12];               /*结束时间*/
+}video_summary_data;
+
+typedef struct PERSON_DATA          /*人员信息*/
+{
+    char bus_work_status;           /*汽车运行状态*/
+    char people_num;                /*人员数量*/
+    char longitude[4];              /*经度*/
+    char latitude[4];               /*纬度*/
+    char time_flag[12];               /*时间标签*/
+}person_data;
+#pragma (pop)
 
 int main(int argc, char *argv[])
 {
@@ -49,19 +80,74 @@ int main(int argc, char *argv[])
 void process(FILE *fp, int sockfd)
 {
     char sendline[MAXDATASIZE],recvbuf[MAXDATASIZE];
-    int num;
+    int num = 0, datalength, person_data_num;
+
+    data test_data;
+    person_data test_person_data;
+    video_summary_data test_video_data;
+
     printf("Connect to server.\n");
 
-    printf("Input th string want to send:");
-    scanf("%s",sendline);
-    num = strlen(sendline);
-    sendline[num] = '\0';
-    num = send(sockfd,sendline, strlen(sendline),0);
-    printf("Send numbyte is %d\n",num);
-
+    strcpy(test_data.start_symbol,"AAAAAAAAAAAAABB");
+    test_data.start_symbol[15] = '\0';
+    test_data.data_NO = 1;
+    getthetime(test_data.time_flag);
+    strcpy(test_data.terminal_ID,"00000000000000000111");
+	printf("test_data.yerminal_ID is:%s",test_data.terminal_ID);
+    strcpy(test_data.schedule_num,"0001");
+    test_data.data_type = 0x20;
+    test_person_data.bus_work_status = 0x10;
+    test_person_data.people_num = '9';
+    strcpy(test_person_data.latitude,"2324");
+    strcpy(test_person_data.longitude,"4578");
+    getthetime(test_person_data.time_flag);
+    person_data_num = 1;
+    datalength = person_data_num *22 + 4;
+    strcpy(sendline,(char *)&test_data);
+    (*(int *)(sendline + 73)) = datalength;
+    (*(int *)(sendline + 77)) = person_data_num;
+    strcpy((sendline + 81),(char *)&test_person_data);
+    send(sockfd,sendline,103,0);
     num = recv(sockfd,recvbuf,MAXDATASIZE,0);
     recvbuf[num] = '\0';
     printf("%s\n",recvbuf);
 }
 
+void getthetime(char hyy[12])
+{
+    char lyy[3],MM[3],dd[3],hh[3],mm[3],ss[3];
+    int year,month,day,hour,min,sec;
+    time_t rawtime;
+    struct tm * timeinfo;
+
+    time ( &rawtime );
+    timeinfo = localtime ( &rawtime );
+
+    year = (1900+timeinfo->tm_year)%100;
+    month = 1+timeinfo->tm_mon;
+    day = timeinfo->tm_mday;
+    hour = timeinfo->tm_hour;
+    min = timeinfo->tm_min;
+    sec = timeinfo->tm_sec;
+
+    lyy[0] = (year/10) + '0';
+    lyy[1] = (year%10) + '0';
+    lyy[2] = '\0';
+    MM[0] = (month/10) + '0';
+    MM[1] = (month%10) + '0';
+    MM[2] = '\0';
+    dd[0] = (day/10) + '0';
+    dd[1] = (day%10) + '0';
+    dd[2] = '\0';
+    hh[0] = (hour/10) + '0';
+    hh[1] = (hour%10) + '0';
+    hh[2] = '\0';
+    mm[0] = (min/10) + '0';
+    mm[1] = (min%10) + '0';
+    mm[2] = '\0';
+    ss[0] = (sec/10) + '0';
+    ss[1] = (sec%10) + '0';
+    ss[2] = '\0';
+    sprintf(hyy,"%s%s%s%s%s%s",lyy,MM,dd,hh,mm,ss);
+}
 

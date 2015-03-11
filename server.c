@@ -144,24 +144,25 @@ void process_cli(int connfd, struct sockaddr_in client)
             num = (*(int *)(recvbuf + 73));             //获取数据长度
             lprintf(log, INFO, "actually should recevied %d bytes\n",num);
                                                         //记录原本应该接收到的字节数
-            if(rtn != (num + 73))                       //判断是否接受完毕
+            if(rtn != (num + 77))                       //判断是否接受完毕
             {
                 num = num + rtn;                        //num作为接收数组下标而移动
                 continue;                               //未接受完毕则提前结束本次循环,继续接收
             }
         }
-    }while(rtn != (num + 73));                          //循环条件
+    }while(rtn != (num + 77));                          //循环条件
 
     getthetime(receipttime);                            //获取接收数据的时间
 
     now_data = (data *)recvbuf;                         //取出前面一部分信息
 
-    if(strcmp((*now_data).start_symbol,"AAAAAAAAAAAAABBB") != 0)
+    if(strcmp((*now_data).start_symbol,"AAAAAAAAAAAAABB") != 0)
                                                         //若不是启动符，则丢弃数据
     {
         lprintf(log, FATAL, "Recvied a invalid data.\n");
         return;                                         //函数返回
     }
+    lprintf(log, INFO, "The start_symbol is %s\n",(*now_data).start_symbol);
 
     while(1)                            /*连接数据库*/
     {
@@ -180,7 +181,9 @@ void process_cli(int connfd, struct sockaddr_in client)
     }
 
     /*此处查询schedule排班表看该车是否发车，若未发车则不处理，还需要修改*/
-    sprintf(sql, "select * from schedule where schedule_num= '%s'",(*now_data).schedule_num);
+    sprintf(sql, "select * from schedule where schedule_num='%s'",(*now_data).schedule_num);
+    lprintf(log, INFO, "The s_num is %s\n",(*now_data).schedule_num);
+
     if(res = mysql_query(&my_connection, sql) != 0)
                                                         //查数据库schedule表看接收到的班次号是否发车
     {
@@ -189,7 +192,8 @@ void process_cli(int connfd, struct sockaddr_in client)
         return;
     }
 
-    sprintf(sql, "select * from bus_base_info where terminal_id= '%s'",(*now_data).terminal_ID);
+    sprintf(sql, "select * from bus_base_info where terminal_id='%s'",(*now_data).terminal_ID);
+    lprintf(log, INFO, "The TID is %s\n",(*now_data).terminal_ID);
 
     if(res = mysql_query(&my_connection, sql) != 0)
                                                         //查数据库bus_base_info表看接收到的前端机ID是否存在
