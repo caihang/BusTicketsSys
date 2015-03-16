@@ -19,10 +19,10 @@ typedef struct DATA
 {
     char start_symbol[16];          /*启动符*/
     int data_NO;                    /*数据包流水号*/
-    char time_flag[13];             /*时间标签*/
+    char time_flag[12];             /*时间标签*/
     char terminal_ID[20];           /*前端机标识号*/
     char schedule_num[10];          /*班次号*/
-    char Authentication_codes[11];  /*认证码*/
+    char Authentication_codes[10];  /*认证码*/
     char data_type;                 /*数据类型*/
 }data;
 
@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
 void process(FILE *fp, int sockfd)
 {
     char sendline[MAXDATASIZE],recvbuf[MAXDATASIZE];
-    int num = 0, datalength, person_data_num;
+    int num = 0, datalength, person_data_num = 2;
 
     data test_data;
     person_data test_person_data;
@@ -89,28 +89,41 @@ void process(FILE *fp, int sockfd)
     printf("Connect to server.\n");
 
     strcpy(test_data.start_symbol,"AAAAAAAAAAAAABB");
-    test_data.start_symbol[15] = '\0';
-    test_data.data_NO = 1;
+    //test_data.start_symbol[15] = '\0';
+	strcpy(sendline,test_data.start_symbol);
+    test_data.data_NO = 5;
+	(*(int *)(sendline + 16)) = test_data.data_NO;
     getthetime(test_data.time_flag);
-    strcpy(test_data.terminal_ID,"00000000000000000111");
-	printf("test_data.yerminal_ID is:%s",test_data.terminal_ID);
+	strcpy((sendline + 20),test_data.time_flag);
+    strcpy(test_data.terminal_ID,"0000000000000000111");
+	test_data.terminal_ID[19] = '\0';
+	strcpy((sendline + 32),test_data.terminal_ID);
     strcpy(test_data.schedule_num,"0001");
-    test_data.data_type = 0x20;
+	test_data.schedule_num[9] = '\0';
+    strcpy((sendline + 52),test_data.schedule_num);
+    test_data.data_type = 48&0x000000ff;
+	printf("data_type is %x\n",test_data.data_type);
+	strcpy((sendline + 62),"111111111");
+	sendline[71] = '\0';
+	sendline[72] = test_data.data_type;
     test_person_data.bus_work_status = 0x10;
     test_person_data.people_num = '9';
     strcpy(test_person_data.latitude,"2324");
     strcpy(test_person_data.longitude,"4578");
     getthetime(test_person_data.time_flag);
-    person_data_num = 1;
     datalength = person_data_num *22 + 4;
-    strcpy(sendline,(char *)&test_data);
     (*(int *)(sendline + 73)) = datalength;
     (*(int *)(sendline + 77)) = person_data_num;
-    strcpy((sendline + 81),(char *)&test_person_data);
+	sendline[81] = test_person_data.bus_work_status;
+	sendline[82] = test_person_data.people_num;
+	strcpy((sendline + 83),test_person_data.latitude);
+	strcpy((sendline + 87),test_person_data.longitude);
+	strcpy((sendline + 91),test_person_data.time_flag);
     send(sockfd,sendline,103,0);
-    num = recv(sockfd,recvbuf,MAXDATASIZE,0);
+    /*num = recv(sockfd,recvbuf,MAXDATASIZE,0);
     recvbuf[num] = '\0';
-    printf("%s\n",recvbuf);
+    printf("recevied:%s\n",recvbuf);*/
+	close(sockfd);
 }
 
 void getthetime(char hyy[12])
