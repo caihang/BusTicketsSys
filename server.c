@@ -121,6 +121,8 @@ void process_cli(int connfd, struct sockaddr_in client)
 	MYSQL_ROW row;
     int i, rtn, offset, res = 0, num = 0, rowcount = 0;                   //iÓÃÓÚÑ­»·ÏÂ±ê£¬numÓÃÓÚÅĞ¶ÏÊı¾İÊÇ·ñ½ÓÊÕÍê±Ï,rtnÊÇ½ÓÊÜº¯ÊıµÄ·µ»ØÖµ£¬offsetÊÇÓÃÓÚÊı¾İ´¦ÀíÊ±µÄÆ«ÒÆÁ¿,resÓÃÓÚmy_query·µ»ØÖµ,rowcountÓÃÓÚ»ñµÃĞĞÊı
     int video_data_num, person_data_num;                //ÊÓÆµÕªÒªĞÅÏ¢ÌõÊıºÍÈËÊıĞÅÏ¢ÌõÊı
+	char video_data_type = 32&0x000000ff;
+	char person_data_type = 48&0x000000ff;
 
     char ftpserverIPaddr[4];                            //ftpserverIPaddrÓÃÀ´Ôİ´æftp·şÎñÆ÷IPµØÖ·
     char recvbuf[MAXDATASIZE];                          //½ÓÊÕÊı¾İ»º³åÇø
@@ -243,21 +245,21 @@ void process_cli(int connfd, struct sockaddr_in client)
 		}
 	}
 
-   /* if(rtn = Authentication((*now_data).terminal_ID, (*now_data).Authentication_codes) == 0)
+    rtn = Authentication(now_data->terminal_ID, now_data->Authentication_codes);
+    if(rtn == 0)
                                                         //Èç¹ûÑéÖ¤Âë´íÎó
     {
-		printf("the terminal_ID is %s and the Anthentication_codes is %s\n",(*now_data).terminal_ID,(*now_data).Authentication_codes);
+		printf("the terminal_ID is %s and the Anthentication_codes is %s\n",now_data->terminal_ID,now_data->Authentication_codes);
         lprintf(log, FATAL, "Authentication_code wrong!\n");         //ÔòÏÔÊ¾²¢·µ»Ø
         mysql_close(&my_connection);
         return;
-    }*/
+    }
 
     /*Êı¾İÎŞÎó£¬¿ªÊ¼´¦Àí*/
-	printf("%x\n",now_data->data_type);
-	/*if(now_data->data_type == 32&0x000000ff);                     //Èç¹ûÊı¾İÀàĞÍÊÇÊÓÆµÕªÒªĞÅÏ¢
+	if(now_data->data_type == video_data_type)                     //Èç¹ûÊı¾İÀàĞÍÊÇÊÓÆµÕªÒªĞÅÏ¢
     {
         memcpy(ftpserverIPaddr, recvbuf+77,4);          //½«ftp·şÎñÆ÷ipµØÖ·¿½±´
-        video_data_num = (*(int *)recvbuf + 81);        //»ñÈ¡Êı¾İÄÚÈİÀïgpsÊı¾İµÄÊı¾İÌõÊı
+        video_data_num = (*(int *)(recvbuf + 81));        //»ñÈ¡Êı¾İÄÚÈİÀïgpsÊı¾İµÄÊı¾İÌõÊı
 
         if(video_data_num <= 0)                         //Èç¹ûÊı¾İ³¤¶ÈĞ¡ÓÚ0£¬Ôò¶ªÆú¸Ã´íÎóÊı¾İ£¬²¢¼ÇÂ¼ÈÕÖ¾
         {
@@ -284,18 +286,17 @@ void process_cli(int connfd, struct sockaddr_in client)
             }
             offset+=74;                                                   //Æ«ÒÆÁ¿ÒÆ¶¯64¸ö×Ö½ÚÒÔ»ñÈ¡ÏÂÒ»Ìõ¼ÇÂ¼
         }
-		*/
+		
         /***»Ø´«¿Í»§¶ËÓ¦´ğÊı¾İ·â×°ºÍ·¢ËÍ***/
        /*(*now_data).data_type = 0x21;
         (*now_data).data_NO++;
-        send(connfd,(char *)now_data,sizeof(data),0);
-    }*/
+        send(connfd,(char *)now_data,sizeof(data),0);*/
+    }
 
-    if(now_data->data_type == 48&0x000000ff)                                 //Èç¹ûÊı¾İÀàĞÍÊÇÈËÔ±ĞÅÏ¢
+    if(now_data->data_type == person_data_type)                                 //Èç¹ûÊı¾İÀàĞÍÊÇÈËÔ±ĞÅÏ¢
     {
-        person_data_num = (*(int *)recvbuf + 77);                       //»ñÈ¡½ÓÊÕµ½µÄÈËÔ±ĞÅÏ¢Êı¾İÌõÊı
-		printf("the num is %d\n",person_data_num);
-        if(person_data_num <= 0)                                        //Èç¹ûÊı¾İ³¤¶ÈĞ¡ÓÚ0Ôò¶ªÆúÊı¾İ
+        person_data_num = (*(int *)(recvbuf + 77));                       //»ñÈ¡½ÓÊÕµ½µÄÈËÔ±ĞÅÏ¢Êı¾İÌõÊı
+		if(person_data_num <= 0)                                        //Èç¹ûÊı¾İ³¤¶ÈĞ¡ÓÚ0Ôò¶ªÆúÊı¾İ
         {
             lprintf(log, FATAL, "recvied person data's length is less than 0.\n");
             mysql_close(&my_connection);
@@ -303,11 +304,11 @@ void process_cli(int connfd, struct sockaddr_in client)
         }
 
         offset = 81;
-        for(i = 0; i < 1; /*i < person_data_num;*/ i++)
+        for(i = 0; i < person_data_num; i++)
         {
             now_person_data = (person_data *)(recvbuf + offset);        /*½«Êı¾İ×ª»»Îªnow_person_data½á¹¹ÌåÊı¾İ*/
-            sprintf(sql, "insert into data_from_terminal(serialnumber,schedule_num,terminal_id,bus_status,longitude,latitude,num_of_people,collect_time,receipttime)values('%d','%s','%s','%c','%s','%s','%c','%s','%s')",now_data->data_NO, now_data->schedule_num,  now_data->terminal_ID, now_person_data->bus_work_status, now_person_data->longitude, now_person_data->latitude, now_person_data->people_num, now_person_data->time_flag, receipttime);
-			lprintf(log, INFO, "the sql is %s\n",sql);
+            sprintf(sql, "insert into data_from_terminal(serialnumber,schedule_num,terminal_id,bus_status,longitude,latitude,num_of_people,collect_time,receipttime)values('%d','%s','%s','%c','%s','%s','%c','%s','%s')",now_data->data_NO, now_data->schedule_num, now_data->terminal_ID, now_person_data->bus_work_status, now_person_data->longitude, now_person_data->latitude, now_person_data->people_num, now_person_data->time_flag, receipttime);
+			
 			mysql_query(&my_connection,sql);
             if(res!= 0)                    //²åÈëÒ»ÌõÈËÔ±ĞÅÏ¢
             {
@@ -352,12 +353,15 @@ int Authentication(char terminal_id[], char Authentication_code[])   /*ÑéÖ¤Âë´¦À
     int i, j;/*i,jÓÃÓÚÑ­»·*/
     char result[10];
 
-    for(i =0, j = 6; i < 10; i++, j++)
+    for(i =0, j = 6; i < 9; i++, j++)
     {
-        result[i] = ~terminal_id[j];
-		printf("%c",result[i]);
+        if(terminal_id[j] == '0')
+		  result[i] = '1';
+		else
+		  result[i] = '0';
     }
-
+	result[9] = '\0';
+	printf("the result is %s\n",result);
     if(strcmp(result,Authentication_code) != 0)return 0;  /*ÑéÖ¤Âë²»ÕıÈ·*/
     else return 1;
 }

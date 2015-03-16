@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
 void process(FILE *fp, int sockfd)
 {
     char sendline[MAXDATASIZE],recvbuf[MAXDATASIZE];
-    int num = 0, datalength, person_data_num = 2;
+    int num = 0, datalength, person_data_num = 1;
 
     data test_data;
     person_data test_person_data;
@@ -89,7 +89,7 @@ void process(FILE *fp, int sockfd)
     printf("Connect to server.\n");
 
     strcpy(test_data.start_symbol,"AAAAAAAAAAAAABB");
-    //test_data.start_symbol[15] = '\0';
+    test_data.start_symbol[15] = '\0';
 	strcpy(sendline,test_data.start_symbol);
     test_data.data_NO = 5;
 	(*(int *)(sendline + 16)) = test_data.data_NO;
@@ -106,9 +106,10 @@ void process(FILE *fp, int sockfd)
 	strcpy((sendline + 62),"111111111");
 	sendline[71] = '\0';
 	sendline[72] = test_data.data_type;
-    test_person_data.bus_work_status = 0x10;
+    test_person_data.bus_work_status = '1';
     test_person_data.people_num = '9';
-    strcpy(test_person_data.latitude,"2324");
+    strcpy(test_person_data.latitude,"234");
+	test_person_data.latitude[3] = '\0';
     strcpy(test_person_data.longitude,"4578");
     getthetime(test_person_data.time_flag);
     datalength = person_data_num *22 + 4;
