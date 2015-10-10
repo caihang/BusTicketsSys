@@ -1,2 +1,3 @@
 gcc -I/usr/include/mysql server.c tpool.c log.c -L/usr/lib/mysql -lmysqlclient -g -o server -lpthread
 gcc -o server server.c tpool.c log.c 'mysql_config --cflags --libs '
+MySql:caihang admincai root-ch1994

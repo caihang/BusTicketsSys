@@ -156,7 +156,7 @@ void process_cli(int connfd, struct sockaddr_in client)
             }
         }
     }while(rtn != (num + 77));                          //循环条件
-    
+
     getthetime(receipttime);                            //获取接收数据的时间
     now_data = (data *)recvbuf;                         //取出前面一部分信息
 
@@ -234,7 +234,7 @@ void process_cli(int connfd, struct sockaddr_in client)
 				{
 					lprintf(log, INFO, "find the s_num\n");
 					mysql_free_result(result);
-				}	
+				}
 			}while(row =mysql_fetch_row(result));
 		}
 		else
@@ -273,7 +273,7 @@ void process_cli(int connfd, struct sockaddr_in client)
         {
             now_video_data = (video_summary_data *)(recvbuf + offset);    //将数据转换为video结构体
             sprintf(sql, "insert into video_summary_info(serialnumber,schedule_num,erminal_id,FTPserverIPaddr,video_name,starttime,endtime,receipttime)values('%d','%s','%s','%s','%s','%s','%s','%s')",now_data->data_NO, now_data->schedule_num, now_data->terminal_ID,ftpserverIPaddr, now_video_data->video_file_name, now_video_data->start_time, now_video_data->end_time, receipttime);                //连接查询语句
-			mysql_query(&my_connection,sql);
+			res = mysql_query(&my_connection,sql);
             if(res != 0)                      //插入一条视频摘要信息
             {
                 lprintf(log, FATAL, "insert video_summary_data failed\n");
@@ -286,7 +286,7 @@ void process_cli(int connfd, struct sockaddr_in client)
             }
             offset+=74;                                                   //偏移量移动64个字节以获取下一条记录
         }
-		
+
         /***回传客户端应答数据封装和发送***/
        /*(*now_data).data_type = 0x21;
         (*now_data).data_NO++;
@@ -308,8 +308,8 @@ void process_cli(int connfd, struct sockaddr_in client)
         {
             now_person_data = (person_data *)(recvbuf + offset);        /*将数据转换为now_person_data结构体数据*/
             sprintf(sql, "insert into data_from_terminal(serialnumber,schedule_num,terminal_id,bus_status,longitude,latitude,num_of_people,collect_time,receipttime)values('%d','%s','%s','%c','%s','%s','%c','%s','%s')",now_data->data_NO, now_data->schedule_num, now_data->terminal_ID, now_person_data->bus_work_status, now_person_data->longitude, now_person_data->latitude, now_person_data->people_num, now_person_data->time_flag, receipttime);
-			
-			mysql_query(&my_connection,sql);
+
+			res = mysql_query(&my_connection,sql);
             if(res!= 0)                    //插入一条人员信息
             {
 				lprintf(log, FATAL, "the res is %d\n",res);
